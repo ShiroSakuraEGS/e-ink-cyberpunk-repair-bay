@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEON REPAIR BAY — Cyberpunk Device Workshop</title>
+  <meta name="description" content="扮演 Cyberpunk 修理員，在 3D 裝置拆解視圖中診斷並修理未來科技裝置。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- 掃描線特效覆蓋層 -->
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- 頂部 HUD 導覽列 -->
+  <header class="hud-header" role="banner">
+    <div class="hud-logo">
+      <span class="logo-bracket">[</span>
+      <span class="logo-text">NEON REPAIR BAY</span>
+      <span class="logo-bracket">]</span>
+      <span class="logo-sub">v2.077</span>
+    </div>
+    <nav class="hud-nav" role="navigation" aria-label="主導覽">
+      <div class="nav-item active" id="nav-workshop" data-screen="workshop">
+        <span class="nav-icon">⬡</span> 修理工坊
+      </div>
+      <div class="nav-item" id="nav-devices" data-screen="devices">
+        <span class="nav-icon">◈</span> 裝置庫
+      </div>
+      <div class="nav-item" id="nav-log" data-screen="log">
+        <span class="nav-icon">◉</span> 修理日誌
+      </div>
+    </nav>
+    <div class="hud-status">
+      <div class="status-item">
+        <span class="status-label">技師</span>
+        <span class="status-value" id="player-name">GHOST_7</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">聲望</span>
+        <span class="status-value neon-cyan" id="player-rep">1,247</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">NC¥</span>
+        <span class="status-value neon-yellow" id="player-credits">48,390</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要內容區域 -->
+  <main class="main-content" role="main">
+
+    <!-- 畫面 A：修理工坊 -->
+    <section id="screen-workshop" class="screen active" aria-label="修理工坊">
+
+      <!-- 左側 Panel：裝置選擇 -->
+      <aside class="panel panel-left" id="device-selector-panel" aria-label="待修裝置列表">
+        <div class="panel-header">
+          <span class="panel-title">// 待修裝置</span>
+          <span class="panel-badge blink" id="queue-count">3 件</span>
+        </div>
+        <div class="device-queue" id="device-queue" role="list">
+        </div>
+        <div class="panel-footer">
+          <div class="footer-label">接受任務 →</div>
+          <button class="btn-cyber" id="btn-accept-job" aria-label="接受修理任務">
+            <span>接受委託</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- 中央 Panel：3D 裝置檢視 -->
+      <div class="panel panel-center" id="device-view-panel" aria-label="3D裝置視圖">
+        <div class="panel-header">
+          <span class="panel-title" id="device-view-title">// 裝置：未選取</span>
+          <div class="view-controls" role="toolbar" aria-label="視圖控制">
+            <button class="view-btn active" id="btn-view-assembled" title="組裝狀態" aria-pressed="true">■</button>
+            <button class="view-btn" id="btn-view-explode" title="拆解視圖" aria-pressed="false">⬡</button>
+            <button class="view-btn" id="btn-view-scan" title="掃描模式" aria-pressed="false">◈</button>
+          </div>
+        </div>
+        <div class="device-viewport" id="device-viewport" role="img" aria-label="裝置3D檢視區域">
+          <div class="viewport-placeholder" id="viewport-placeholder">
+            <div class="placeholder-icon">◈</div>
+            <div class="placeholder-text">選取左側裝置<br/>開始診斷</div>
+          </div>
+          <div class="device-scene" id="device-scene" hidden>
+            <div class="scene-floor" aria-hidden="true"></div>
+            <div class="device-3d-wrapper" id="device-3d-wrapper">
+            </div>
+            <!-- WASD 操作提示 -->
+            <div class="wasd-hint" aria-label="鍵盤操作說明" aria-hidden="true">
+              <span class="key-badge">W</span><span class="key-badge">A</span><span class="key-badge">S</span><span class="key-badge">D</span>
+              <span>旋轉</span>
+              <span class="hint-sep">·</span>
+              <span class="key-badge">Q</span><span class="key-badge">E</span>
+              <span>縮放</span>
+              <span class="hint-sep">·</span>
+              <span class="key-badge">R</span>
+              <span>重置</span>
+              <span class="hint-sep">·</span>
+              <span>拖曳旋轉</span>
+            </div>
+          </div>
+          <div class="scan-overlay" id="scan-overlay" hidden aria-hidden="true">
+            <div class="scan-bar"></div>
+            <div class="scan-result" id="scan-result"></div>
+          </div>
+        </div>
+        <div class="repair-progress-bar" id="repair-progress-bar" hidden>
+          <div class="progress-label">修理進度</div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+          </div>
+          <div class="progress-pct" id="progress-pct">0%</div>
+        </div>
+      </div>
+
+      <!-- 右側 Panel：零件資訊 & 修理操作 -->
+      <aside class="panel panel-right" id="parts-panel" aria-label="零件資訊與修理操作">
+        <div class="panel-header">
+          <span class="panel-title">// 零件資訊</span>
+        </div>
+        <div class="parts-info" id="parts-info">
+          <div class="no-selection-msg">← 點擊零件查看詳情</div>
+        </div>
+        <div class="panel-divider"></div>
+        <div class="panel-header">
+          <span class="panel-title">// 修理操作</span>
+        </div>
+        <div class="repair-actions" id="repair-actions">
+          <button class="action-btn" id="btn-diagnose" disabled aria-label="執行診斷掃描">
+            <span class="action-icon">◈</span>
+            <span class="action-label">執行診斷</span>
+          </button>
+          <button class="action-btn" id="btn-replace-part" disabled aria-label="更換零件">
+            <span class="action-icon">⬡</span>
+            <span class="action-label">更換零件</span>
+          </button>
+          <button class="action-btn" id="btn-calibrate" disabled aria-label="校準裝置">
+            <span class="action-icon">◉</span>
+            <span class="action-label">校準裝置</span>
+          </button>
+          <button class="action-btn btn-complete" id="btn-complete-repair" disabled aria-label="完成修理">
+            <span class="action-icon">✦</span>
+            <span class="action-label">完成修理</span>
+          </button>
+        </div>
+        <div class="panel-divider"></div>
+        <div class="panel-header">
+          <span class="panel-title">// 技師終端機</span>
+        </div>
+        <div class="terminal" id="terminal" role="log" aria-live="polite" aria-label="系統終端機輸出">
+          <div class="terminal-line system">[ SYS ] NEON REPAIR BAY 已連線</div>
+          <div class="terminal-line system">[ SYS ] 等待裝置連接...</div>
+        </div>
+      </aside>
+
+    </section>
+
+    <!-- 畫面 B：裝置庫 -->
+    <section id="screen-devices" class="screen" aria-label="裝置知識庫" hidden>
+      <div class="knowledge-base">
+        <div class="kb-header">
+          <h1 class="kb-title">// 裝置技術資料庫</h1>
+          <p class="kb-subtitle">E Ink 電子紙技術參考手冊</p>
+        </div>
+        <div class="kb-grid" id="kb-grid" role="list">
+        </div>
+      </div>
+    </section>
+
+    <!-- 畫面 C：修理日誌 -->
+    <section id="screen-log" class="screen" aria-label="修理日誌" hidden>
+      <div class="repair-log-screen">
+        <div class="kb-header">
+          <h1 class="kb-title">// 修理日誌</h1>
+          <p class="kb-subtitle">歷史任務記錄</p>
+        </div>
+        <div class="log-list" id="log-list" role="list">
+          <div class="log-empty">尚無修理記錄</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 零件詳情 Modal -->
+  <div class="modal-overlay" id="part-modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="part-modal-title">
+    <div class="modal-box" id="part-modal-box">
+      <div class="modal-header">
+        <span class="modal-title" id="part-modal-title">零件詳情</span>
+        <button class="modal-close" id="part-modal-close" aria-label="關閉視窗">✕</button>
+      </div>
+      <div class="modal-body" id="part-modal-body">
+      </div>
+    </div>
+  </div>
+
+  <!-- 任務完成動畫覆蓋層 -->
+  <div class="complete-overlay" id="complete-overlay" hidden aria-hidden="true">
+    <div class="complete-box">
+      <div class="complete-icon">✦</div>
+      <div class="complete-title">修理完成！</div>
+      <div class="complete-device" id="complete-device-name"></div>
+      <div class="complete-reward">
+        <span class="reward-label">獲得</span>
+        <span class="reward-value" id="complete-reward"></span>
+      </div>
+      <button class="btn-cyber" id="btn-complete-ok" aria-label="確認完成">繼續接單</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
